@@ -53,6 +53,15 @@ export default function App() {
   });
 
   const getProxiedUrl = (url) => {
+    // If we are on a static host like Netlify or GitHub Pages, the proxy won't work.
+    // We check if the current origin is a known static host.
+    const isStaticHost = window.location.hostname.includes('netlify.app') || 
+                         window.location.hostname.includes('github.io');
+    
+    if (isStaticHost) {
+      return url; // Try direct load as a fallback
+    }
+
     if (url.startsWith('/api/proxy')) return url;
     return `/api/proxy?url=${encodeURIComponent(url)}`;
   };
