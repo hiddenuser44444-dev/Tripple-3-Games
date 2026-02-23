@@ -94,6 +94,8 @@ export default function App() {
 
   // Proxy State
   const [proxyUrl, setProxyUrl] = useState('');
+  const [currentProxyUrl, setCurrentProxyUrl] = useState('');
+  const [proxyInput, setProxyInput] = useState('');
 
   // AI State
   const [chatMessages, setChatMessages] = useState([]);
@@ -361,11 +363,42 @@ export default function App() {
                 )}
                 <div 
                   id="game-frame-container"
-                  className={`flex-1 overflow-hidden bg-black relative ${isFullscreen ? '' : 'rounded-3xl border border-emerald-500/20 shadow-2xl'}`}
+                  className={`flex-1 overflow-hidden bg-black relative flex flex-col ${isFullscreen ? '' : 'rounded-3xl border border-emerald-500/20 shadow-2xl'}`}
                 >
+                  {selectedGame.id === 'proxy-session' && (
+                    <div className="bg-slate-900/90 backdrop-blur-md border-b border-white/10 p-2 flex gap-2 items-center">
+                      <div className="flex-1 relative">
+                        <Globe className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={14} />
+                        <input 
+                          type="text"
+                          value={proxyInput}
+                          onChange={(e) => setProxyInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              let url = proxyInput;
+                              if (!url.startsWith('http')) url = 'https://' + url;
+                              setCurrentProxyUrl(url);
+                            }
+                          }}
+                          className="w-full bg-slate-800/50 border border-white/5 rounded-lg py-1.5 pl-9 pr-4 text-xs text-white outline-none focus:border-emerald-500/50 transition-all"
+                          placeholder="Enter URL..."
+                        />
+                      </div>
+                      <button 
+                        onClick={() => {
+                          let url = proxyInput;
+                          if (!url.startsWith('http')) url = 'https://' + url;
+                          setCurrentProxyUrl(url);
+                        }}
+                        className="px-3 py-1.5 bg-emerald-500 text-white rounded-lg text-xs font-bold hover:bg-emerald-400 transition-all"
+                      >
+                        Go
+                      </button>
+                    </div>
+                  )}
                   <iframe 
-                    src={getProxiedUrl(selectedGame.url)}
-                    className="w-full h-full border-none"
+                    src={selectedGame.id === 'proxy-session' ? getProxiedUrl(currentProxyUrl) : getProxiedUrl(selectedGame.url)}
+                    className="w-full flex-1 border-none"
                     title={selectedGame.title}
                     allowFullScreen
                     allow="autoplay; fullscreen; camera; focus-without-user-activation *; monetization; gamepad; keyboard-map *; xr-spatial-tracking; clipboard-write"
@@ -451,10 +484,12 @@ export default function App() {
                     if (!proxyUrl.startsWith('http')) {
                       finalUrl = `https://${proxyUrl}`;
                     }
+                    setCurrentProxyUrl(finalUrl);
+                    setProxyInput(finalUrl);
                     setSelectedGame({
                       id: 'proxy-session',
                       title: 'Scramjet Session',
-                      url: `/api/proxy?url=${encodeURIComponent(finalUrl)}`,
+                      url: finalUrl,
                     });
                     setActiveTab('games');
                   }
@@ -467,7 +502,7 @@ export default function App() {
           </motion.div>
         )}
 
-        {activeTab === 'hacks' && (
+                {activeTab === 'hacks' && (
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -487,20 +522,35 @@ export default function App() {
                   desc: "A powerful GUI for web manipulation and tools.",
                   code: "javascript:(function(){var s=document.createElement('script');s.src='https://gitlab.com/CidCaribou/x-gui/-/raw/main/x-gui.min.js?ref_type=heads';document.body.appendChild(s);})();"
                 }
-              ].map((hack, i) => (
-                <div key={i} className="glass-card p-8 space-y-4 flex flex-col">
-                  <h3 className="text-xl font-bold text-emerald-500">{hack.title}</h3>
-                  <p className="text-sm text-slate-400 flex-1">{hack.desc}</p>
-                  <a 
-                    href={hack.code}
-                    onClick={(e) => e.preventDefault()}
-                    className="glow-button text-white py-3 rounded-xl font-bold text-center cursor-move select-none"
-                    title="Drag this to your bookmarks bar"
-                  >
-                    Drag Me
-                  </a>
-                </div>
-              ))}
+              ].map((hack, i) => {
+                const linkRef = useRef(null);
+                useEffect(() => {
+                  if (linkRef.current) {
+                    linkRef.current.setAttribute('href', hack.code);
+                  }
+                }, [hack.code]);
+
+                return (
+                  <div key={i} className="glass-card p-8 space-y-4 flex flex-col">
+                    <h3 className="text-xl font-bold text-emerald-500">{hack.title}</h3>
+                    <p className="text-sm text-slate-400 flex-1">{hack.desc}</p>
+                    <a 
+                      ref={linkRef}
+                      onClick={(e) => {
+                        if (e.currentTarget.getAttribute('href').startsWith('javascript:')) {
+                          // Allow the default behavior for bookmarklets
+                          return;
+                        }
+                        e.preventDefault();
+                      }}
+                      className="glow-button text-white py-3 rounded-xl font-bold text-center cursor-move select-none"
+                      title="Drag this to your bookmarks bar"
+                    >
+                      Drag Me
+                    </a>
+                  </div>
+                );
+              })}
             </div>
           </motion.div>
         )}

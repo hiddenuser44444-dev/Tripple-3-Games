@@ -50,7 +50,27 @@ async function startServer() {
       }
       
       // Strip security headers that prevent iframing
-      const headersToRemove = ['x-frame-options', 'content-security-policy', 'content-security-policy-report-only', 'cross-origin-resource-policy', 'strict-transport-security'];
+      const headersToRemove = [
+        'x-frame-options', 
+        'content-security-policy', 
+        'content-security-policy-report-only', 
+        'cross-origin-resource-policy', 
+        'cross-origin-opener-policy',
+        'cross-origin-embedder-policy',
+        'strict-transport-security'
+      ];
+      
+      // Set headers from target, excluding security ones
+      Object.keys(response.headers).forEach(key => {
+        if (!headersToRemove.includes(key.toLowerCase())) {
+          res.setHeader(key, response.headers[key]);
+        }
+      });
+
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', '*');
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
       
       let data = response.data;
       if (contentType.includes('text/html')) {
@@ -64,14 +84,6 @@ async function startServer() {
           data = baseTag + html;
         }
       }
-
-      // Basic header passthrough
-      const headersToPass = ['cache-control', 'content-language', 'expires', 'last-modified', 'pragma'];
-      headersToPass.forEach(h => {
-        if (response.headers[h] && !headersToRemove.includes(h)) {
-          res.setHeader(h, response.headers[h]);
-        }
-      });
 
       res.status(response.status).send(data);
     } catch (error) {
