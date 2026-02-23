@@ -75,7 +75,7 @@ export default function App() {
         document.head.appendChild(newLink);
       }
     } else {
-      document.title = "Gassy Goellner Games";
+      document.title = "GGG";
       const link = document.querySelector("link[rel~='icon']");
       if (link) {
         link.href = LOGO_URL;
