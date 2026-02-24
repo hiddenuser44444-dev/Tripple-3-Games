@@ -2,7 +2,7 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
-import axios from "axios";
+import { createProxyMiddleware } from "http-proxy-middleware";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -11,84 +11,61 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  // Improved Proxy Route
-  app.all("/api/proxy", async (req, res) => {
-    const targetUrl = req.query.url;
-    if (!targetUrl) {
-      return res.status(400).send("URL is required");
+  // Robust Proxy using http-proxy-middleware
+  const proxy = createProxyMiddleware({
+    target: "http://localhost:3000", // Placeholder, will be overridden by router
+    router: (req) => {
+      return req.query.url;
+    },
+    changeOrigin: true,
+    followRedirects: true,
+    secure: false,
+    pathRewrite: (path, req) => {
+      return ""; 
+    },
+    on: {
+      proxyReq: (proxyReq, req, res) => {
+        proxyReq.setHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
+        proxyReq.setHeader('Accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8');
+        proxyReq.setHeader('Accept-Language', 'en-US,en;q=0.9');
+        proxyReq.removeHeader('Origin');
+        proxyReq.removeHeader('Referer');
+      },
+      proxyRes: (proxyRes, req, res) => {
+        const headersToRemove = [
+          'x-frame-options', 
+          'content-security-policy', 
+          'content-security-policy-report-only', 
+          'cross-origin-resource-policy', 
+          'cross-origin-opener-policy',
+          'cross-origin-embedder-policy',
+          'strict-transport-security',
+          'x-content-type-options'
+        ];
+        headersToRemove.forEach(h => delete proxyRes.headers[h]);
+        proxyRes.headers['Access-Control-Allow-Origin'] = '*';
+        proxyRes.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
+        proxyRes.headers['Access-Control-Allow-Headers'] = '*';
+      },
+      error: (err, req, res) => {
+        console.error("Proxy Error:", err);
+        if (!res.headersSent) {
+          res.status(500).json({ error: "Proxy failed to reach the target site." });
+        }
+      }
     }
+  });
 
+  app.use("/api/v1/browse", (req, res, next) => {
+    if (!req.query.url) {
+      return res.status(400).json({ error: "URL parameter is required" });
+    }
     try {
-      const response = await axios({
-        method: req.method,
-        url: targetUrl,
-        data: req.body,
-        params: req.query,
-        responseType: 'arraybuffer',
-        maxRedirects: 5,
-        validateStatus: () => true,
-        headers: {
-          'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0',
-          'Accept': req.headers['accept'] || '*/*',
-          'Accept-Language': req.headers['accept-language'] || 'en-US,en;q=0.9',
-          'Cookie': req.headers['cookie'] || '',
-          'Referer': targetUrl,
-        }
-      });
-      
-      const finalUrl = response.request.res.responseUrl || targetUrl;
-      const contentType = response.headers['content-type'] || 'text/html';
-      res.setHeader('Content-Type', contentType);
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', '*');
-      res.setHeader('Access-Control-Allow-Credentials', 'true');
-      
-      // Handle set-cookie headers from target
-      if (response.headers['set-cookie']) {
-        res.setHeader('Set-Cookie', response.headers['set-cookie']);
-      }
-      
-      // Strip security headers that prevent iframing
-      const headersToRemove = [
-        'x-frame-options', 
-        'content-security-policy', 
-        'content-security-policy-report-only', 
-        'cross-origin-resource-policy', 
-        'cross-origin-opener-policy',
-        'cross-origin-embedder-policy',
-        'strict-transport-security'
-      ];
-      
-      // Set headers from target, excluding security ones
-      Object.keys(response.headers).forEach(key => {
-        if (!headersToRemove.includes(key.toLowerCase())) {
-          res.setHeader(key, response.headers[key]);
-        }
-      });
-
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', '*');
-      res.setHeader('Access-Control-Allow-Credentials', 'true');
-      
-      let data = response.data;
-      if (contentType.includes('text/html')) {
-        const html = data.toString();
-        const baseTag = `<base href="${finalUrl}">`;
-        if (html.includes('<head>')) {
-          data = html.replace('<head>', `<head>${baseTag}`);
-        } else if (html.includes('<html>')) {
-          data = html.replace('<html>', `<html><head>${baseTag}</head>`);
-        } else {
-          data = baseTag + html;
-        }
-      }
-
-      res.status(response.status).send(data);
-    } catch (error) {
-      res.status(500).send("Proxy Error: " + error.message);
+      new URL(req.query.url);
+    } catch (e) {
+      return res.status(400).json({ error: "Invalid URL provided" });
     }
+    return proxy(req, res, next);
   });
 
   // Vite middleware for development
