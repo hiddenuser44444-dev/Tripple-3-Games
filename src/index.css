@@ -9,8 +9,8 @@
 }
 
 body {
-  background-color: #020617;
-  color: #f8fafc;
+  background-color: var(--bg-main, #020617);
+  color: var(--text-main, #f8fafc);
   overflow-x: hidden;
 }
 
@@ -79,7 +79,21 @@ body {
   border-radius: 10px;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(16, 185, 129, 0.4);
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
