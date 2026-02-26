@@ -4,7 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import { createBareServer } from "@tomphttp/bare-server-node";
-import { wispWS } from "wisp-server-node";
+import wisp from "@mercuryworkshop/wisp-js";
 import http from "http";
 import db from "./db.js";
 import bodyParser from "body-parser";
@@ -56,7 +56,7 @@ async function startServer() {
   // Wisp & Bare Server Integration
   server.on("upgrade", (req, socket, head) => {
     if (req.url.startsWith("/wisp/")) {
-      wispWS(req, socket, head);
+      wisp(req, socket, head);
     } else if (bare.shouldRoute(req)) {
       bare.routeUpgrade(req, socket, head);
     }
